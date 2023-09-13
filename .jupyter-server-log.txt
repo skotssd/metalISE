@@ -38234,3 +38234,2078 @@ terminate called after throwing an instance of 'zmq::error_t'
 [W 17:04:55.347 NotebookApp] delete /pH7pt5_NDReffluent_allcalibs.ipynb
 [I 17:04:58.698 NotebookApp] Saving file at /KNO3_pH10_0pt1uMCuT.ipynb
 [I 17:05:06.551 NotebookApp] New terminal with automatic name: 2
+[I 18:57:52.800 NotebookApp] Kernel started: 3a24f5f2-8c66-4d3b-b628-8f1214b13a70, name: xoctave
+OpenGL vendor: VMware, Inc.
+OpenGL renderer: llvmpipe (LLVM 10.0.0, 128 bits)
+OpenGL version: 3.1 Mesa 20.0.8
+Run with XEUS 3.0.5
+[W 18:59:13.391 NotebookApp] 404 GET /api/contents/NDAsample_electrodeA_allcalibs.ipynb?1694631553376 (172.24.0.1): file or directory does not exist: 'NDAsample_electrodeA_allcalibs.ipynb'
+[W 18:59:13.391 NotebookApp] file or directory does not exist: 'NDAsample_electrodeA_allcalibs.ipynb'
+[W 18:59:13.393 NotebookApp] 404 GET /api/contents/NDAsample_electrodeA_allcalibs.ipynb?1694631553376 (172.24.0.1) 2.790000ms referer=https://jupyter6.clearnasdss.synology.me/lab/tree/pH10_0pt1uMCuT_electrodeA_allcalibs.ipynb
+[W 18:59:13.480 NotebookApp] 404 GET /api/contents/NDAsample_electrodeA_allcalibs.ipynb?content=0&1694631553468 (172.24.0.1): file or directory does not exist: 'NDAsample_electrodeA_allcalibs.ipynb'
+[W 18:59:13.481 NotebookApp] file or directory does not exist: 'NDAsample_electrodeA_allcalibs.ipynb'
+[W 18:59:13.482 NotebookApp] 404 GET /api/contents/NDAsample_electrodeA_allcalibs.ipynb?content=0&1694631553468 (172.24.0.1) 3.520000ms referer=https://jupyter6.clearnasdss.synology.me/lab/tree/pH10_0pt1uMCuT_electrodeA_allcalibs.ipynb
+[I 18:59:13.574 NotebookApp] Uploading file to /NDAsample_electrodeA_allcalibs.ipynb
+[I 19:01:13.746 NotebookApp] Saving file at /NDAsample_electrodeA_allcalibs.ipynb
+[I 19:07:13.892 NotebookApp] Saving file at /NDAsample_electrodeA_allcalibs.ipynb
+Executing: % setup environment
+% set path to equilibrium solver
+txt=pwd;
+n=length(txt);
+rootpath=txt; %txt(1:n-8);
+PHREEQCpath=[rootpath,'/runPHREEQC'];
+addpath(PHREEQCpath);
+JEQUILIBpath=[rootpath,'/JEQUILIB']; addpath(JEQUILIBpath);
+Cumodelspath=[rootpath,'/Cutableaus']; addpath(Cumodelspath);
+% clear data and number format
+clear; format short e
+% turn off warnings
+warning off
+graphics_toolkit ("notebook"); 
+graphics_toolkit ("plotly"); 
+Executing: % put in constants
+VT=0.05; %total volume
+stockCuconc=0.0152067;
+Executing: % put in data
+data=[...
+%volCu mV pH
+0 42.2 2.034
+50 44.2 2.026
+150 69.7 2.022
+400 76.6 2.023
+900 78.6 2.026
+];
+
+originalsamplemVnpH=[...
+%pH mV
+7.461 -62.1
+7.467 -62
+];
+Executing: % process the data
+pH=mean(originalsamplemVnpH(:,1))
+mVAoriginal=(originalsamplemVnpH(:,2));
+addedCuvol=data(:,1)'*1e-6;
+pHcalib=data(:,3);
+
+mVA=data(:,2)'; Emeas=mVA; CuTmeas=1e-7; CuT=CuTmeas;
+CuTplus=(CuTmeas*(VT)+addedCuvol*stockCuconc)./(VT+addedCuvol);
+
+%chlorocorrecxtion
+%BF1=2.49; BF2=1.14; BF3=0.9; ClT=4.9904e-4; %from Inorg. Chem. 1983. 22. 3323-3326.
+%CuTplus=CuTplus./(1+BF1*ClT+BF2*ClT^2+BF3*ClT^3);
+
+%determine free Cu for the sample using the method of Tait et al.
+m1=59.2/2; Eacid=Emeas(1); Eorig=mean(mVAoriginal); %m=param(1); 
+Eo1=Eacid-(m1)*log10(CuT);
+logCuonept=(Eorig-Eo1)/m1
+%determine free Cu for the sample using the method of Tait et al. but use measured slope
+param1=polyfit(log10(CuTplus(2:end)),Emeas(2:end),1); m2=param1(1);
+Eacid=Emeas(1); Eorig=mean(mVAoriginal); 
+Eo2=Eacid-(m2)*log10(CuT);
+logCuoneptmeasuredslope=(Eorig-Eo2)/m2
+%determine free Cu using all the calibration points
+param2=polyfit(log10(CuTplus(1:end)),Emeas(1:end),1);
+logCufullcalib=(mean(mVAoriginal)-param2(2))/param2(1)
+%determine free Cu using high Cu additions (linear part)
+param3=polyfit(log10(CuTplus(2:end)),Emeas(2:end),1);
+logCulinearcalib=(mean(mVAoriginal)-param3(2))/param3(1)
+%determine free Cu using two lowest points.  variable slope method like Marcinek et al.
+param4=polyfit(log10(CuTplus(1:2)),Emeas(1:2),1);
+logCulowslopecalib=(mean(mVAoriginal)-param4(2))/param4(1)
+
+%use logisticmodel
+logisticfunction = @(p,logx) (p(1)+(p(2)-p(1))./(1+10.^(p(3)-logx)*p(4)));
+errfunction=@(p,logx,Emeas) (log10(sum((Emeas-logisticfunction(p,logx)).^2)));
+ptst=[95 160 -4 0.7];
+logx=-8:0.1:-3; model=logisticfunction(ptst,logx);
+err=errfunction(ptst,log10(CuTplus),Emeas)
+plot(log10(CuTplus),Emeas,'ko')
+hold on
+plot(logx,model,'k-')
+% now best fit
+options = optimset('Display','off','TolFun',1e-4,'TolX',1e-4);
+pbest=fminsearch(@(p) errfunction(p,log10(CuTplus),Emeas),ptst,options)
+model=logisticfunction(pbest,logx);
+plot(logx,model,'k--')
+list
+string: -8
+list
+string: -7
+list
+string: -6
+list
+string: -5
+list
+string: -4
+list
+string: -3
+list
+string: 40
+list
+string: 60
+list
+string: 80
+list
+string: 100
+list
+string: 120
+list
+string: 140
+list
+string: 160
+string: 
+string: 
+Executing: % fit using Nikolskii-Eisenman equation
+%E=E0+Slog(Cu +kH); parameters E0, S, k
+
+NEeqn=@(p,x1,x2) (p(1)+p(2).*log10(x1+p(3).*x2));
+errfunction=@(p,x1,x2,Emeas) (log10(sum((Emeas-NEeqn(p,x1,x2)).^2)));
+
+
+H=10.^-pHcalib; ptst=[250 59.2/2 0.0006];
+model=NEeqn(ptst,CuTplus',H);
+err=errfunction(ptst,CuTplus',H,Emeas')
+
+plot(log10(CuTplus), Emeas,'ko')
+hold on; plot(log10(CuTplus),model,'k-')
+
+
+% now best fit
+pbestNE=fminsearch(@(p) errfunction(p,CuTplus',H,Emeas'),ptst,options)
+NEmodel=NEeqn(pbestNE,CuTplus',H);
+plot(log10(CuTplus),model,'k--')
+list
+string: -7
+list
+string: -6.5
+list
+string: -6
+list
+string: -5.5
+list
+string: -5
+list
+string: -4.5
+list
+string: -4
+list
+string: -3.5
+list
+string: 40
+list
+string: 60
+list
+string: 80
+list
+string: 100
+list
+string: 120
+list
+string: 140
+list
+string: 160
+string: 
+string: 
+Executing: % MODEL FOR COMPARISON
+graphics_toolkit("notebook")
+%model with just inorganic speciation
+%geochemical model
+% input the constants and solution chemistry
+
+flag1=2; %flag1 for concentration based search vector (1) or for log based search vector (2).
+flag2=1; %flag2 for numerical derivatives (2) or analtyical derivatives (1)
+database=[]; 
+flag3=0; % flag3 1 for show warnings. 0 no warnings
+flag4=0; %if=1 solve tableau one line at a time to get a good initial guess (no solids). really challenging probs only
+flag5=0; %if=1 use stored initial guess for including solids
+
+CuT=CuTmeas; inorganicTOTALS=[CuT];
+inorganicTOTALS(inorganicTOTALS==0)=1e-16; % get rid of zero values, b/c div by zero error
+TOTALS=[inorganicTOTALS]; %TOTALS=inorganicTOTALS;
+pH=pH; pe=20.75-pH; PCO2=10^-3.5;
+[Cuall,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableauallsolids(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+[CuwithCuOs,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableauCuOs(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+[Cunosolid,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableaunosolid(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+
+plot(log10(CuTplus),Emeas,'bo','markersize',8,'markerfacecolor','b')
+
+hold on
+possibleresults=[logCuonept logCuoneptmeasuredslope logCufullcalib logCulinearcalib logCulowslopecalib];
+mVAoriginals=mean(mVAoriginal)*ones(size(possibleresults));
+plot(possibleresults,mVAoriginals,'ko','markerfacecolor','w')
+
+paramTait=[m1 Eo1];
+logCuplot=-13:0.1:-3; Eplot=polyval(paramTait,logCuplot);
+plot(logCuplot,Eplot,'r-','linewidth',1)
+
+paramTait2=[m2 Eo2];
+logCuplot=-13:0.1:-3; Eplot=polyval(paramTait2,logCuplot);
+plot(logCuplot,Eplot,'r--','linewidth',1)
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param2,logCuplot);
+plot(logCuplot,Eplot,'k--')
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param3,logCuplot);
+plot(logCuplot,Eplot,'k:')
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param4,logCuplot);
+plot(logCuplot,Eplot,'k-')
+
+set(gca,'linewidth',2)
+xlabel('log[Cu^{2+}]'); ylabel('E (mV)')
+hold on
+
+plot([log10(Cuall) log10(Cuall)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--')
+plot([log10(Cunosolid) log10(Cunosolid)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--'); hold on
+plot([log10(CuT) log10(CuT)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--','linewidth',2)
+%plot([-9.576 -9.576],[-100 100],'b--')
+
+text(log10(Cunosolid)+0.1,max(Emeas)-(max(Emeas)-mean(mVAoriginal))/4,'model Cu^{2+}','rotation',90)
+text(log10(CuT)+0.1,max(Emeas)-(max(Emeas)-mean(mVAoriginal))/4,'Total Cu','rotation',90)
+
+
+xlabel('log([Cu^{2+}])')
+ylabel('Potential (mV)')
+set(gca,'LineWidth',2,'fontsize',12)
+
+axis([min(log10([Cunosolid Cuall]))-1 max(log10(CuTplus))+0.2 min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)])
+
+% nonlinear fit
+logx=min(possibleresults)-0.2:0.1:max(log10(CuTplus))+1;
+model=logisticfunction(pbest,logx);
+plot(logx,model,'m--','linewidth',2)
+
+logCunonlinear=-((log10((pbest(2)-pbest(1))/(mean(mVAoriginal)-pbest(1))-1))/pbest(4)-pbest(3))
+
+H=10.^-pH; logCuNE=log10(10.^((mean(mVAoriginal)-pbestNE(1))./pbestNE(2))-pbestNE(3)*H)
+
+plot(logCuNE,mean(mVAoriginal),'ko','markerfacecolor','c')
+plot(log10(CuTplus),NEmodel,'c-','linewidth',2)
+Device pixel ratio: 1
+Render time: 362898
+Encode time: 17671
+Send time: 1472
+Draw time: 489288
+Executing: disp('various calibration results')
+logCuonept
+logCuoneptmeasuredslope
+logCufullcalib
+logCulinearcalib
+logCulowslopecalib
+logCuNE
+disp('model results')
+log10(Cunosolid)
+log10(Cuall)
+Executing: % setup environment
+% set path to equilibrium solver
+txt=pwd;
+n=length(txt);
+rootpath=txt; %txt(1:n-8);
+PHREEQCpath=[rootpath,'/runPHREEQC'];
+addpath(PHREEQCpath);
+JEQUILIBpath=[rootpath,'/JEQUILIB']; addpath(JEQUILIBpath);
+Cumodelspath=[rootpath,'/Cutableaus']; addpath(Cumodelspath);
+% clear data and number format
+clear; format short e
+% turn off warnings
+warning off
+graphics_toolkit ("notebook"); 
+graphics_toolkit ("plotly"); 
+Executing: % put in constants
+VT=0.05; %total volume
+stockCuconc=0.0152067;
+Executing: % put in data
+data=[...
+%volCu mV pH
+0 42.2 2.034
+50 44.2 2.026
+150 69.7 2.022
+400 76.6 2.023
+900 78.6 2.026
+];
+
+originalsamplemVnpH=[...
+%pH mV
+7.461 -62.1
+7.467 -62
+];
+Executing: % process the data
+pH=mean(originalsamplemVnpH(:,1))
+mVAoriginal=(originalsamplemVnpH(:,2));
+addedCuvol=data(:,1)'*1e-6;
+pHcalib=data(:,3);
+
+mVA=data(:,2)'; Emeas=mVA; CuTmeas=1e-7; CuT=CuTmeas;
+CuTplus=(CuTmeas*(VT)+addedCuvol*stockCuconc)./(VT+addedCuvol);
+
+%chlorocorrecxtion
+%BF1=2.49; BF2=1.14; BF3=0.9; ClT=4.9904e-4; %from Inorg. Chem. 1983. 22. 3323-3326.
+%CuTplus=CuTplus./(1+BF1*ClT+BF2*ClT^2+BF3*ClT^3);
+
+%determine free Cu for the sample using the method of Tait et al.
+m1=59.2/2; Eacid=Emeas(1); Eorig=mean(mVAoriginal); %m=param(1); 
+Eo1=Eacid-(m1)*log10(CuT);
+logCuonept=(Eorig-Eo1)/m1
+%determine free Cu for the sample using the method of Tait et al. but use measured slope
+param1=polyfit(log10(CuTplus(2:end)),Emeas(2:end),1); m2=param1(1);
+Eacid=Emeas(1); Eorig=mean(mVAoriginal); 
+Eo2=Eacid-(m2)*log10(CuT);
+logCuoneptmeasuredslope=(Eorig-Eo2)/m2
+%determine free Cu using all the calibration points
+param2=polyfit(log10(CuTplus(1:end)),Emeas(1:end),1);
+logCufullcalib=(mean(mVAoriginal)-param2(2))/param2(1)
+%determine free Cu using high Cu additions (linear part)
+param3=polyfit(log10(CuTplus(2:end)),Emeas(2:end),1);
+logCulinearcalib=(mean(mVAoriginal)-param3(2))/param3(1)
+%determine free Cu using two lowest points.  variable slope method like Marcinek et al.
+param4=polyfit(log10(CuTplus(1:2)),Emeas(1:2),1);
+logCulowslopecalib=(mean(mVAoriginal)-param4(2))/param4(1)
+
+%use logisticmodel
+logisticfunction = @(p,logx) (p(1)+(p(2)-p(1))./(1+10.^(p(3)-logx)*p(4)));
+errfunction=@(p,logx,Emeas) (log10(sum((Emeas-logisticfunction(p,logx)).^2)));
+ptst=[40 80 -4 0.7];
+logx=-8:0.1:-3; model=logisticfunction(ptst,logx);
+err=errfunction(ptst,log10(CuTplus),Emeas)
+plot(log10(CuTplus),Emeas,'ko')
+hold on
+plot(logx,model,'k-')
+% now best fit
+options = optimset('Display','off','TolFun',1e-4,'TolX',1e-4);
+pbest=fminsearch(@(p) errfunction(p,log10(CuTplus),Emeas),ptst,options)
+model=logisticfunction(pbest,logx);
+plot(logx,model,'k--')
+list
+string: -8
+list
+string: -7
+list
+string: -6
+list
+string: -5
+list
+string: -4
+list
+string: -3
+list
+string: 30
+list
+string: 40
+list
+string: 50
+list
+string: 60
+list
+string: 70
+list
+string: 80
+list
+string: 90
+string: 
+string: 
+Executing: % fit using Nikolskii-Eisenman equation
+%E=E0+Slog(Cu +kH); parameters E0, S, k
+
+NEeqn=@(p,x1,x2) (p(1)+p(2).*log10(x1+p(3).*x2));
+errfunction=@(p,x1,x2,Emeas) (log10(sum((Emeas-NEeqn(p,x1,x2)).^2)));
+
+
+H=10.^-pHcalib; ptst=[250 59.2/2 0.0006];
+model=NEeqn(ptst,CuTplus',H);
+err=errfunction(ptst,CuTplus',H,Emeas')
+
+plot(log10(CuTplus), Emeas,'ko')
+hold on; plot(log10(CuTplus),model,'k-')
+
+
+% now best fit
+pbestNE=fminsearch(@(p) errfunction(p,CuTplus',H,Emeas'),ptst,options)
+NEmodel=NEeqn(pbestNE,CuTplus',H);
+plot(log10(CuTplus),model,'k--')
+list
+string: -7
+list
+string: -6.5
+list
+string: -6
+list
+string: -5.5
+list
+string: -5
+list
+string: -4.5
+list
+string: -4
+list
+string: -3.5
+list
+string: 40
+list
+string: 60
+list
+string: 80
+list
+string: 100
+list
+string: 120
+list
+string: 140
+list
+string: 160
+string: 
+string: 
+Executing: % MODEL FOR COMPARISON
+graphics_toolkit("notebook")
+%model with just inorganic speciation
+%geochemical model
+% input the constants and solution chemistry
+
+flag1=2; %flag1 for concentration based search vector (1) or for log based search vector (2).
+flag2=1; %flag2 for numerical derivatives (2) or analtyical derivatives (1)
+database=[]; 
+flag3=0; % flag3 1 for show warnings. 0 no warnings
+flag4=0; %if=1 solve tableau one line at a time to get a good initial guess (no solids). really challenging probs only
+flag5=0; %if=1 use stored initial guess for including solids
+
+CuT=CuTmeas; inorganicTOTALS=[CuT];
+inorganicTOTALS(inorganicTOTALS==0)=1e-16; % get rid of zero values, b/c div by zero error
+TOTALS=[inorganicTOTALS]; %TOTALS=inorganicTOTALS;
+pH=pH; pe=20.75-pH; PCO2=10^-3.5;
+[Cuall,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableauallsolids(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+[CuwithCuOs,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableauCuOs(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+[Cunosolid,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableaunosolid(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+
+plot(log10(CuTplus),Emeas,'bo','markersize',8,'markerfacecolor','b')
+
+hold on
+possibleresults=[logCuonept logCuoneptmeasuredslope logCufullcalib logCulinearcalib logCulowslopecalib];
+mVAoriginals=mean(mVAoriginal)*ones(size(possibleresults));
+plot(possibleresults,mVAoriginals,'ko','markerfacecolor','w')
+
+paramTait=[m1 Eo1];
+logCuplot=-13:0.1:-3; Eplot=polyval(paramTait,logCuplot);
+plot(logCuplot,Eplot,'r-','linewidth',1)
+
+paramTait2=[m2 Eo2];
+logCuplot=-13:0.1:-3; Eplot=polyval(paramTait2,logCuplot);
+plot(logCuplot,Eplot,'r--','linewidth',1)
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param2,logCuplot);
+plot(logCuplot,Eplot,'k--')
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param3,logCuplot);
+plot(logCuplot,Eplot,'k:')
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param4,logCuplot);
+plot(logCuplot,Eplot,'k-')
+
+set(gca,'linewidth',2)
+xlabel('log[Cu^{2+}]'); ylabel('E (mV)')
+hold on
+
+plot([log10(Cuall) log10(Cuall)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--')
+plot([log10(Cunosolid) log10(Cunosolid)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--'); hold on
+plot([log10(CuT) log10(CuT)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--','linewidth',2)
+%plot([-9.576 -9.576],[-100 100],'b--')
+
+text(log10(Cunosolid)+0.1,max(Emeas)-(max(Emeas)-mean(mVAoriginal))/4,'model Cu^{2+}','rotation',90)
+text(log10(CuT)+0.1,max(Emeas)-(max(Emeas)-mean(mVAoriginal))/4,'Total Cu','rotation',90)
+
+
+xlabel('log([Cu^{2+}])')
+ylabel('Potential (mV)')
+set(gca,'LineWidth',2,'fontsize',12)
+
+axis([min(log10([Cunosolid Cuall]))-1 max(log10(CuTplus))+0.2 min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)])
+
+% nonlinear fit
+logx=min(possibleresults)-0.2:0.1:max(log10(CuTplus))+1;
+model=logisticfunction(pbest,logx);
+plot(logx,model,'m--','linewidth',2)
+
+logCunonlinear=-((log10((pbest(2)-pbest(1))/(mean(mVAoriginal)-pbest(1))-1))/pbest(4)-pbest(3))
+
+H=10.^-pH; logCuNE=log10(10.^((mean(mVAoriginal)-pbestNE(1))./pbestNE(2))-pbestNE(3)*H)
+
+plot(logCuNE,mean(mVAoriginal),'ko','markerfacecolor','c')
+plot(log10(CuTplus),NEmodel,'c-','linewidth',2)
+Device pixel ratio: 1
+Render time: 347338
+Encode time: 18327
+Send time: 1047
+Draw time: 381426
+Executing: disp('various calibration results')
+logCuonept
+logCuoneptmeasuredslope
+logCufullcalib
+logCulinearcalib
+logCulowslopecalib
+logCuNE
+disp('model results')
+log10(Cunosolid)
+log10(Cuall)
+[I 19:09:14.029 NotebookApp] Saving file at /NDAsample_electrodeA_allcalibs.ipynb
+Executing: % setup environment
+% set path to equilibrium solver
+txt=pwd;
+n=length(txt);
+rootpath=txt; %txt(1:n-8);
+PHREEQCpath=[rootpath,'/runPHREEQC'];
+addpath(PHREEQCpath);
+JEQUILIBpath=[rootpath,'/JEQUILIB']; addpath(JEQUILIBpath);
+Cumodelspath=[rootpath,'/Cutableaus']; addpath(Cumodelspath);
+% clear data and number format
+clear; format short e
+% turn off warnings
+warning off
+graphics_toolkit ("notebook"); 
+graphics_toolkit ("plotly"); 
+Executing: % put in constants
+VT=0.05; %total volume
+stockCuconc=0.0152067;
+Executing: % put in data
+data=[...
+%volCu mV pH
+0 42.2 2.034
+50 44.2 2.026
+150 69.7 2.022
+400 76.6 2.023
+900 82.2 2.026
+];
+
+originalsamplemVnpH=[...
+%pH mV
+7.461 -62.1
+7.467 -62
+];
+Executing: % process the data
+pH=mean(originalsamplemVnpH(:,1))
+mVAoriginal=(originalsamplemVnpH(:,2));
+addedCuvol=data(:,1)'*1e-6;
+pHcalib=data(:,3);
+
+mVA=data(:,2)'; Emeas=mVA; CuTmeas=1e-7; CuT=CuTmeas;
+CuTplus=(CuTmeas*(VT)+addedCuvol*stockCuconc)./(VT+addedCuvol);
+
+%chlorocorrecxtion
+%BF1=2.49; BF2=1.14; BF3=0.9; ClT=4.9904e-4; %from Inorg. Chem. 1983. 22. 3323-3326.
+%CuTplus=CuTplus./(1+BF1*ClT+BF2*ClT^2+BF3*ClT^3);
+
+%determine free Cu for the sample using the method of Tait et al.
+m1=59.2/2; Eacid=Emeas(1); Eorig=mean(mVAoriginal); %m=param(1); 
+Eo1=Eacid-(m1)*log10(CuT);
+logCuonept=(Eorig-Eo1)/m1
+%determine free Cu for the sample using the method of Tait et al. but use measured slope
+param1=polyfit(log10(CuTplus(2:end)),Emeas(2:end),1); m2=param1(1);
+Eacid=Emeas(1); Eorig=mean(mVAoriginal); 
+Eo2=Eacid-(m2)*log10(CuT);
+logCuoneptmeasuredslope=(Eorig-Eo2)/m2
+%determine free Cu using all the calibration points
+param2=polyfit(log10(CuTplus(1:end)),Emeas(1:end),1);
+logCufullcalib=(mean(mVAoriginal)-param2(2))/param2(1)
+%determine free Cu using high Cu additions (linear part)
+param3=polyfit(log10(CuTplus(2:end)),Emeas(2:end),1);
+logCulinearcalib=(mean(mVAoriginal)-param3(2))/param3(1)
+%determine free Cu using two lowest points.  variable slope method like Marcinek et al.
+param4=polyfit(log10(CuTplus(1:2)),Emeas(1:2),1);
+logCulowslopecalib=(mean(mVAoriginal)-param4(2))/param4(1)
+
+%use logisticmodel
+logisticfunction = @(p,logx) (p(1)+(p(2)-p(1))./(1+10.^(p(3)-logx)*p(4)));
+errfunction=@(p,logx,Emeas) (log10(sum((Emeas-logisticfunction(p,logx)).^2)));
+ptst=[40 80 -4 0.7];
+logx=-8:0.1:-3; model=logisticfunction(ptst,logx);
+err=errfunction(ptst,log10(CuTplus),Emeas)
+plot(log10(CuTplus),Emeas,'ko')
+hold on
+plot(logx,model,'k-')
+% now best fit
+options = optimset('Display','off','TolFun',1e-4,'TolX',1e-4);
+pbest=fminsearch(@(p) errfunction(p,log10(CuTplus),Emeas),ptst,options)
+model=logisticfunction(pbest,logx);
+plot(logx,model,'k--')
+list
+string: -8
+list
+string: -7
+list
+string: -6
+list
+string: -5
+list
+string: -4
+list
+string: -3
+list
+string: 30
+list
+string: 40
+list
+string: 50
+list
+string: 60
+list
+string: 70
+list
+string: 80
+list
+string: 90
+string: 
+string: 
+Executing: % fit using Nikolskii-Eisenman equation
+%E=E0+Slog(Cu +kH); parameters E0, S, k
+
+NEeqn=@(p,x1,x2) (p(1)+p(2).*log10(x1+p(3).*x2));
+errfunction=@(p,x1,x2,Emeas) (log10(sum((Emeas-NEeqn(p,x1,x2)).^2)));
+
+
+H=10.^-pHcalib; ptst=[250 59.2/2 0.0006];
+model=NEeqn(ptst,CuTplus',H);
+err=errfunction(ptst,CuTplus',H,Emeas')
+
+plot(log10(CuTplus), Emeas,'ko')
+hold on; plot(log10(CuTplus),model,'k-')
+
+
+% now best fit
+pbestNE=fminsearch(@(p) errfunction(p,CuTplus',H,Emeas'),ptst,options)
+NEmodel=NEeqn(pbestNE,CuTplus',H);
+plot(log10(CuTplus),model,'k--')
+list
+string: -7
+list
+string: -6.5
+list
+string: -6
+list
+string: -5.5
+list
+string: -5
+list
+string: -4.5
+list
+string: -4
+list
+string: -3.5
+list
+string: 40
+list
+string: 60
+list
+string: 80
+list
+string: 100
+list
+string: 120
+list
+string: 140
+list
+string: 160
+string: 
+string: 
+Executing: % MODEL FOR COMPARISON
+graphics_toolkit("notebook")
+%model with just inorganic speciation
+%geochemical model
+% input the constants and solution chemistry
+
+flag1=2; %flag1 for concentration based search vector (1) or for log based search vector (2).
+flag2=1; %flag2 for numerical derivatives (2) or analtyical derivatives (1)
+database=[]; 
+flag3=0; % flag3 1 for show warnings. 0 no warnings
+flag4=0; %if=1 solve tableau one line at a time to get a good initial guess (no solids). really challenging probs only
+flag5=0; %if=1 use stored initial guess for including solids
+
+CuT=CuTmeas; inorganicTOTALS=[CuT];
+inorganicTOTALS(inorganicTOTALS==0)=1e-16; % get rid of zero values, b/c div by zero error
+TOTALS=[inorganicTOTALS]; %TOTALS=inorganicTOTALS;
+pH=pH; pe=20.75-pH; PCO2=10^-3.5;
+[Cuall,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableauallsolids(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+[CuwithCuOs,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableauCuOs(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+[Cunosolid,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableaunosolid(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+
+plot(log10(CuTplus),Emeas,'bo','markersize',8,'markerfacecolor','b')
+
+hold on
+possibleresults=[logCuonept logCuoneptmeasuredslope logCufullcalib logCulinearcalib logCulowslopecalib];
+mVAoriginals=mean(mVAoriginal)*ones(size(possibleresults));
+plot(possibleresults,mVAoriginals,'ko','markerfacecolor','w')
+
+paramTait=[m1 Eo1];
+logCuplot=-13:0.1:-3; Eplot=polyval(paramTait,logCuplot);
+plot(logCuplot,Eplot,'r-','linewidth',1)
+
+paramTait2=[m2 Eo2];
+logCuplot=-13:0.1:-3; Eplot=polyval(paramTait2,logCuplot);
+plot(logCuplot,Eplot,'r--','linewidth',1)
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param2,logCuplot);
+plot(logCuplot,Eplot,'k--')
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param3,logCuplot);
+plot(logCuplot,Eplot,'k:')
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param4,logCuplot);
+plot(logCuplot,Eplot,'k-')
+
+set(gca,'linewidth',2)
+xlabel('log[Cu^{2+}]'); ylabel('E (mV)')
+hold on
+
+plot([log10(Cuall) log10(Cuall)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--')
+plot([log10(Cunosolid) log10(Cunosolid)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--'); hold on
+plot([log10(CuT) log10(CuT)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--','linewidth',2)
+%plot([-9.576 -9.576],[-100 100],'b--')
+
+text(log10(Cunosolid)+0.1,max(Emeas)-(max(Emeas)-mean(mVAoriginal))/4,'model Cu^{2+}','rotation',90)
+text(log10(CuT)+0.1,max(Emeas)-(max(Emeas)-mean(mVAoriginal))/4,'Total Cu','rotation',90)
+
+
+xlabel('log([Cu^{2+}])')
+ylabel('Potential (mV)')
+set(gca,'LineWidth',2,'fontsize',12)
+
+axis([min(log10([Cunosolid Cuall]))-1 max(log10(CuTplus))+0.2 min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)])
+
+% nonlinear fit
+logx=min(possibleresults)-0.2:0.1:max(log10(CuTplus))+1;
+model=logisticfunction(pbest,logx);
+plot(logx,model,'m--','linewidth',2)
+
+logCunonlinear=-((log10((pbest(2)-pbest(1))/(mean(mVAoriginal)-pbest(1))-1))/pbest(4)-pbest(3))
+
+H=10.^-pH; logCuNE=log10(10.^((mean(mVAoriginal)-pbestNE(1))./pbestNE(2))-pbestNE(3)*H)
+
+plot(logCuNE,mean(mVAoriginal),'ko','markerfacecolor','c')
+plot(log10(CuTplus),NEmodel,'c-','linewidth',2)
+Device pixel ratio: 1
+Render time: 457896
+Encode time: 26316
+Send time: 7027
+Draw time: 507212
+Executing: disp('various calibration results')
+logCuonept
+logCuoneptmeasuredslope
+logCufullcalib
+logCulinearcalib
+logCulowslopecalib
+logCuNE
+disp('model results')
+log10(Cunosolid)
+log10(Cuall)
+Executing: % fit using Nikolskii-Eisenman equation
+%E=E0+Slog(Cu +kH); parameters E0, S, k
+
+NEeqn=@(p,x1,x2) (p(1)+p(2).*log10(x1+p(3).*x2));
+errfunction=@(p,x1,x2,Emeas) (log10(sum((Emeas-NEeqn(p,x1,x2)).^2)));
+
+
+H=10.^-pHcalib; ptst=[150 59.2/2 0.0006];
+model=NEeqn(ptst,CuTplus',H);
+err=errfunction(ptst,CuTplus',H,Emeas')
+
+plot(log10(CuTplus), Emeas,'ko')
+hold on; plot(log10(CuTplus),model,'k-')
+
+
+% now best fit
+pbestNE=fminsearch(@(p) errfunction(p,CuTplus',H,Emeas'),ptst,options)
+NEmodel=NEeqn(pbestNE,CuTplus',H);
+plot(log10(CuTplus),model,'k--')
+Device pixel ratio: 1
+Render time: 324060
+Encode time: 15543
+Send time: 688
+Draw time: 353226
+Executing: % fit using Nikolskii-Eisenman equation
+%E=E0+Slog(Cu +kH); parameters E0, S, k
+
+NEeqn=@(p,x1,x2) (p(1)+p(2).*log10(x1+p(3).*x2));
+errfunction=@(p,x1,x2,Emeas) (log10(sum((Emeas-NEeqn(p,x1,x2)).^2)));
+
+
+H=10.^-pHcalib; ptst=[50 59.2/2 0.0006];
+model=NEeqn(ptst,CuTplus',H);
+err=errfunction(ptst,CuTplus',H,Emeas')
+
+plot(log10(CuTplus), Emeas,'ko')
+hold on; plot(log10(CuTplus),model,'k-')
+
+
+% now best fit
+pbestNE=fminsearch(@(p) errfunction(p,CuTplus',H,Emeas'),ptst,options)
+NEmodel=NEeqn(pbestNE,CuTplus',H);
+plot(log10(CuTplus),model,'k--')
+Device pixel ratio: 1
+Render time: 319363
+Encode time: 15757
+Send time: 910
+Draw time: 350123
+Executing: % fit using Nikolskii-Eisenman equation
+%E=E0+Slog(Cu +kH); parameters E0, S, k
+
+NEeqn=@(p,x1,x2) (p(1)+p(2).*log10(x1+p(3).*x2));
+errfunction=@(p,x1,x2,Emeas) (log10(sum((Emeas-NEeqn(p,x1,x2)).^2)));
+
+
+H=10.^-pHcalib; ptst=[300 59.2/2 0.0006];
+model=NEeqn(ptst,CuTplus',H);
+err=errfunction(ptst,CuTplus',H,Emeas')
+
+plot(log10(CuTplus), Emeas,'ko')
+hold on; plot(log10(CuTplus),model,'k-')
+
+
+% now best fit
+pbestNE=fminsearch(@(p) errfunction(p,CuTplus',H,Emeas'),ptst,options)
+NEmodel=NEeqn(pbestNE,CuTplus',H);
+plot(log10(CuTplus),model,'k--')
+Device pixel ratio: 1
+Render time: 320723
+Encode time: 15485
+Send time: 675
+Draw time: 351676
+Executing: % fit using Nikolskii-Eisenman equation
+%E=E0+Slog(Cu +kH); parameters E0, S, k
+
+NEeqn=@(p,x1,x2) (p(1)+p(2).*log10(x1+p(3).*x2));
+errfunction=@(p,x1,x2,Emeas) (log10(sum((Emeas-NEeqn(p,x1,x2)).^2)));
+
+
+H=10.^-pHcalib; ptst=[230 59.2/2 0.0006];
+model=NEeqn(ptst,CuTplus',H);
+err=errfunction(ptst,CuTplus',H,Emeas')
+
+plot(log10(CuTplus), Emeas,'ko')
+hold on; plot(log10(CuTplus),model,'k-')
+
+
+% now best fit
+pbestNE=fminsearch(@(p) errfunction(p,CuTplus',H,Emeas'),ptst,options)
+NEmodel=NEeqn(pbestNE,CuTplus',H);
+plot(log10(CuTplus),model,'k--')
+Device pixel ratio: 1
+Render time: 333927
+Encode time: 16703
+Send time: 721
+Draw time: 365122
+Executing: % fit using Nikolskii-Eisenman equation
+%E=E0+Slog(Cu +kH); parameters E0, S, k
+
+NEeqn=@(p,x1,x2) (p(1)+p(2).*log10(x1+p(3).*x2));
+errfunction=@(p,x1,x2,Emeas) (log10(sum((Emeas-NEeqn(p,x1,x2)).^2)));
+
+
+H=10.^-pHcalib; ptst=[200 59.2/2 0.0006];
+model=NEeqn(ptst,CuTplus',H);
+err=errfunction(ptst,CuTplus',H,Emeas')
+
+plot(log10(CuTplus), Emeas,'ko')
+hold on; plot(log10(CuTplus),model,'k-')
+
+
+% now best fit
+pbestNE=fminsearch(@(p) errfunction(p,CuTplus',H,Emeas'),ptst,options)
+NEmodel=NEeqn(pbestNE,CuTplus',H);
+plot(log10(CuTplus),model,'k--')
+Device pixel ratio: 1
+Render time: 351182
+Encode time: 16869
+Send time: 713
+Draw time: 382594
+Executing: % fit using Nikolskii-Eisenman equation
+%E=E0+Slog(Cu +kH); parameters E0, S, k
+
+NEeqn=@(p,x1,x2) (p(1)+p(2).*log10(x1+p(3).*x2));
+errfunction=@(p,x1,x2,Emeas) (log10(sum((Emeas-NEeqn(p,x1,x2)).^2)));
+
+
+H=10.^-pHcalib; ptst=[190 59.2/2 0.0006];
+model=NEeqn(ptst,CuTplus',H);
+err=errfunction(ptst,CuTplus',H,Emeas')
+
+plot(log10(CuTplus), Emeas,'ko')
+hold on; plot(log10(CuTplus),model,'k-')
+
+
+% now best fit
+pbestNE=fminsearch(@(p) errfunction(p,CuTplus',H,Emeas'),ptst,options)
+NEmodel=NEeqn(pbestNE,CuTplus',H);
+plot(log10(CuTplus),model,'k--')
+Device pixel ratio: 1
+Render time: 345758
+Encode time: 17258
+Send time: 969
+Draw time: 381802
+Executing: % setup environment
+% set path to equilibrium solver
+txt=pwd;
+n=length(txt);
+rootpath=txt; %txt(1:n-8);
+PHREEQCpath=[rootpath,'/runPHREEQC'];
+addpath(PHREEQCpath);
+JEQUILIBpath=[rootpath,'/JEQUILIB']; addpath(JEQUILIBpath);
+Cumodelspath=[rootpath,'/Cutableaus']; addpath(Cumodelspath);
+% clear data and number format
+clear; format short e
+% turn off warnings
+warning off
+graphics_toolkit ("notebook"); 
+graphics_toolkit ("plotly"); 
+Executing: % put in constants
+VT=0.05; %total volume
+stockCuconc=0.0152067;
+Executing: % put in data
+data=[...
+%volCu mV pH
+0 42.2 2.034
+50 44.2 2.026
+150 69.7 2.022
+400 76.6 2.023
+900 82.2 2.026
+];
+
+originalsamplemVnpH=[...
+%pH mV
+7.461 -62.1
+7.467 -62
+];
+Executing: % process the data
+pH=mean(originalsamplemVnpH(:,1))
+mVAoriginal=(originalsamplemVnpH(:,2));
+addedCuvol=data(:,1)'*1e-6;
+pHcalib=data(:,3);
+
+mVA=data(:,2)'; Emeas=mVA; CuTmeas=1e-7; CuT=CuTmeas;
+CuTplus=(CuTmeas*(VT)+addedCuvol*stockCuconc)./(VT+addedCuvol);
+
+%chlorocorrecxtion
+%BF1=2.49; BF2=1.14; BF3=0.9; ClT=4.9904e-4; %from Inorg. Chem. 1983. 22. 3323-3326.
+%CuTplus=CuTplus./(1+BF1*ClT+BF2*ClT^2+BF3*ClT^3);
+
+%determine free Cu for the sample using the method of Tait et al.
+m1=59.2/2; Eacid=Emeas(1); Eorig=mean(mVAoriginal); %m=param(1); 
+Eo1=Eacid-(m1)*log10(CuT);
+logCuonept=(Eorig-Eo1)/m1
+%determine free Cu for the sample using the method of Tait et al. but use measured slope
+param1=polyfit(log10(CuTplus(2:end)),Emeas(2:end),1); m2=param1(1);
+Eacid=Emeas(1); Eorig=mean(mVAoriginal); 
+Eo2=Eacid-(m2)*log10(CuT);
+logCuoneptmeasuredslope=(Eorig-Eo2)/m2
+%determine free Cu using all the calibration points
+param2=polyfit(log10(CuTplus(1:end)),Emeas(1:end),1);
+logCufullcalib=(mean(mVAoriginal)-param2(2))/param2(1)
+%determine free Cu using high Cu additions (linear part)
+param3=polyfit(log10(CuTplus(2:end)),Emeas(2:end),1);
+logCulinearcalib=(mean(mVAoriginal)-param3(2))/param3(1)
+%determine free Cu using two lowest points.  variable slope method like Marcinek et al.
+param4=polyfit(log10(CuTplus(1:2)),Emeas(1:2),1);
+logCulowslopecalib=(mean(mVAoriginal)-param4(2))/param4(1)
+
+%use logisticmodel
+logisticfunction = @(p,logx) (p(1)+(p(2)-p(1))./(1+10.^(p(3)-logx)*p(4)));
+errfunction=@(p,logx,Emeas) (log10(sum((Emeas-logisticfunction(p,logx)).^2)));
+ptst=[40 80 -4 0.7];
+logx=-8:0.1:-3; model=logisticfunction(ptst,logx);
+err=errfunction(ptst,log10(CuTplus),Emeas)
+plot(log10(CuTplus),Emeas,'ko')
+hold on
+plot(logx,model,'k-')
+% now best fit
+options = optimset('Display','off','TolFun',1e-4,'TolX',1e-4);
+pbest=fminsearch(@(p) errfunction(p,log10(CuTplus),Emeas),ptst,options)
+model=logisticfunction(pbest,logx);
+plot(logx,model,'k--')
+list
+string: -8
+list
+string: -7
+list
+string: -6
+list
+string: -5
+list
+string: -4
+list
+string: -3
+list
+string: 30
+list
+string: 40
+list
+string: 50
+list
+string: 60
+list
+string: 70
+list
+string: 80
+list
+string: 90
+string: 
+string: 
+Executing: % fit using Nikolskii-Eisenman equation
+%E=E0+Slog(Cu +kH); parameters E0, S, k
+
+NEeqn=@(p,x1,x2) (p(1)+p(2).*log10(x1+p(3).*x2));
+errfunction=@(p,x1,x2,Emeas) (log10(sum((Emeas-NEeqn(p,x1,x2)).^2)));
+
+
+H=10.^-pHcalib; ptst=[190 59.2/2 0.0006];
+model=NEeqn(ptst,CuTplus',H);
+err=errfunction(ptst,CuTplus',H,Emeas')
+
+plot(log10(CuTplus), Emeas,'ko')
+hold on; plot(log10(CuTplus),model,'k-')
+
+
+% now best fit
+pbestNE=fminsearch(@(p) errfunction(p,CuTplus',H,Emeas'),ptst,options)
+NEmodel=NEeqn(pbestNE,CuTplus',H);
+plot(log10(CuTplus),model,'k--')
+list
+string: -7
+list
+string: -6.5
+list
+string: -6
+list
+string: -5.5
+list
+string: -5
+list
+string: -4.5
+list
+string: -4
+list
+string: -3.5
+list
+string: 30
+list
+string: 40
+list
+string: 50
+list
+string: 60
+list
+string: 70
+list
+string: 80
+list
+string: 90
+string: 
+string: 
+Executing: % MODEL FOR COMPARISON
+graphics_toolkit("notebook")
+%model with just inorganic speciation
+%geochemical model
+% input the constants and solution chemistry
+
+flag1=2; %flag1 for concentration based search vector (1) or for log based search vector (2).
+flag2=1; %flag2 for numerical derivatives (2) or analtyical derivatives (1)
+database=[]; 
+flag3=0; % flag3 1 for show warnings. 0 no warnings
+flag4=0; %if=1 solve tableau one line at a time to get a good initial guess (no solids). really challenging probs only
+flag5=0; %if=1 use stored initial guess for including solids
+
+CuT=CuTmeas; inorganicTOTALS=[CuT];
+inorganicTOTALS(inorganicTOTALS==0)=1e-16; % get rid of zero values, b/c div by zero error
+TOTALS=[inorganicTOTALS]; %TOTALS=inorganicTOTALS;
+pH=pH; pe=20.75-pH; PCO2=10^-3.5;
+[Cuall,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableauallsolids(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+[CuwithCuOs,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableauCuOs(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+[Cunosolid,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableaunosolid(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+
+plot(log10(CuTplus),Emeas,'bo','markersize',8,'markerfacecolor','b')
+
+hold on
+possibleresults=[logCuonept logCuoneptmeasuredslope logCufullcalib logCulinearcalib logCulowslopecalib];
+mVAoriginals=mean(mVAoriginal)*ones(size(possibleresults));
+plot(possibleresults,mVAoriginals,'ko','markerfacecolor','w')
+
+paramTait=[m1 Eo1];
+logCuplot=-13:0.1:-3; Eplot=polyval(paramTait,logCuplot);
+plot(logCuplot,Eplot,'r-','linewidth',1)
+
+paramTait2=[m2 Eo2];
+logCuplot=-13:0.1:-3; Eplot=polyval(paramTait2,logCuplot);
+plot(logCuplot,Eplot,'r--','linewidth',1)
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param2,logCuplot);
+plot(logCuplot,Eplot,'k--')
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param3,logCuplot);
+plot(logCuplot,Eplot,'k:')
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param4,logCuplot);
+plot(logCuplot,Eplot,'k-')
+
+set(gca,'linewidth',2)
+xlabel('log[Cu^{2+}]'); ylabel('E (mV)')
+hold on
+
+plot([log10(Cuall) log10(Cuall)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--')
+plot([log10(Cunosolid) log10(Cunosolid)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--'); hold on
+plot([log10(CuT) log10(CuT)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--','linewidth',2)
+%plot([-9.576 -9.576],[-100 100],'b--')
+
+text(log10(Cunosolid)+0.1,max(Emeas)-(max(Emeas)-mean(mVAoriginal))/4,'model Cu^{2+}','rotation',90)
+text(log10(CuT)+0.1,max(Emeas)-(max(Emeas)-mean(mVAoriginal))/4,'Total Cu','rotation',90)
+
+
+xlabel('log([Cu^{2+}])')
+ylabel('Potential (mV)')
+set(gca,'LineWidth',2,'fontsize',12)
+
+axis([min(log10([Cunosolid Cuall]))-1 max(log10(CuTplus))+0.2 min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)])
+
+% nonlinear fit
+logx=min(possibleresults)-0.2:0.1:max(log10(CuTplus))+1;
+model=logisticfunction(pbest,logx);
+plot(logx,model,'m--','linewidth',2)
+
+logCunonlinear=-((log10((pbest(2)-pbest(1))/(mean(mVAoriginal)-pbest(1))-1))/pbest(4)-pbest(3))
+
+H=10.^-pH; logCuNE=log10(10.^((mean(mVAoriginal)-pbestNE(1))./pbestNE(2))-pbestNE(3)*H)
+
+plot(logCuNE,mean(mVAoriginal),'ko','markerfacecolor','c')
+plot(log10(CuTplus),NEmodel,'c-','linewidth',2)
+Device pixel ratio: 1
+Render time: 345983
+Encode time: 17981
+Send time: 965
+Draw time: 378313
+Executing: disp('various calibration results')
+logCuonept
+logCuoneptmeasuredslope
+logCufullcalib
+logCulinearcalib
+logCulowslopecalib
+logCuNE
+disp('model results')
+log10(Cunosolid)
+log10(Cuall)
+[I 19:10:55.110 NotebookApp] Starting buffering for 1a93caa6-bf72-41d6-9e37-89faa73114ca:6712fa5f-3e51-4d92-ad5b-4d9b1c1a0c4d
+[I 19:10:59.204 NotebookApp] Starting buffering for 501c1611-0792-428b-aec5-598ef5cf05cd:727b23bc-947e-4cec-a586-56360805603c
+[I 19:11:01.947 NotebookApp] Kernel started: 58eb9189-d43a-4c35-9d36-e5414dab6d05, name: xoctave
+OpenGL vendor: VMware, Inc.
+OpenGL renderer: llvmpipe (LLVM 10.0.0, 128 bits)
+OpenGL version: 3.1 Mesa 20.0.8
+Run with XEUS 3.0.5
+[I 19:11:14.175 NotebookApp] Saving file at /NDAsample_electrodeA_allcalibs.ipynb
+Executing: % MODEL FOR COMPARISON
+graphics_toolkit("notebook")
+%model with just inorganic speciation
+%geochemical model
+% input the constants and solution chemistry
+
+flag1=2; %flag1 for concentration based search vector (1) or for log based search vector (2).
+flag2=1; %flag2 for numerical derivatives (2) or analtyical derivatives (1)
+database=[]; 
+flag3=0; % flag3 1 for show warnings. 0 no warnings
+flag4=0; %if=1 solve tableau one line at a time to get a good initial guess (no solids). really challenging probs only
+flag5=0; %if=1 use stored initial guess for including solids
+
+CuT=CuTmeas; inorganicTOTALS=[CuT];
+inorganicTOTALS(inorganicTOTALS==0)=1e-16; % get rid of zero values, b/c div by zero error
+TOTALS=[inorganicTOTALS]; %TOTALS=inorganicTOTALS;
+pH=pH; pe=20.75-pH; PCO2=10^-3.5;
+[Cuall,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableauallsolids(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+[CuwithCuOs,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableauCuOs(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+[Cunosolid,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableaunosolid(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+
+plot(log10(CuTplus),Emeas,'bo','markersize',8,'markerfacecolor','b')
+
+hold on
+possibleresults=[logCuonept logCuoneptmeasuredslope logCufullcalib logCulinearcalib logCulowslopecalib];
+mVAoriginals=mean(mVAoriginal)*ones(size(possibleresults));
+plot(possibleresults,mVAoriginals,'ko','markerfacecolor','w')
+
+paramTait=[m1 Eo1];
+logCuplot=-13:0.1:-3; Eplot=polyval(paramTait,logCuplot);
+plot(logCuplot,Eplot,'r-','linewidth',1)
+
+paramTait2=[m2 Eo2];
+logCuplot=-13:0.1:-3; Eplot=polyval(paramTait2,logCuplot);
+plot(logCuplot,Eplot,'r--','linewidth',1)
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param2,logCuplot);
+plot(logCuplot,Eplot,'k--')
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param3,logCuplot);
+plot(logCuplot,Eplot,'k:')
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param4,logCuplot);
+plot(logCuplot,Eplot,'k-')
+
+set(gca,'linewidth',2)
+xlabel('log[Cu^{2+}]'); ylabel('E (mV)')
+hold on
+
+plot([log10(Cuall) log10(Cuall)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--')
+plot([log10(Cunosolid) log10(Cunosolid)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--'); hold on
+plot([log10(CuT) log10(CuT)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--','linewidth',2)
+%plot([-9.576 -9.576],[-100 100],'b--')
+
+text(log10(Cunosolid)+0.1,max(Emeas)-(max(Emeas)-mean(mVAoriginal))/4,'model Cu^{2+}','rotation',90)
+text(log10(CuT)+0.1,max(Emeas)-(max(Emeas)-mean(mVAoriginal))/4,'Total Cu','rotation',90)
+
+
+xlabel('log([Cu^{2+}])')
+ylabel('Potential (mV)')
+set(gca,'LineWidth',2,'fontsize',12)
+
+axis([min(log10([Cunosolid Cuall]))-1 max(log10(CuTplus))+0.2 min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)])
+
+
+% nonlinear fit
+logx=min(possibleresults)-0.2:0.1:max(log10(CuTplus))+1;
+model=logisticfunction(pbest,logx);
+plot(logx,model,'m--','linewidth',2)
+
+logCunonlinear=-((log10((pbest(2)-pbest(1))/(mean(mVAoriginal)-pbest(1))-1))/pbest(4)-pbest(3))
+
+H=10.^-pH; logCuNE=log10(10.^((mean(mVAoriginal)-pbestNE(1))./pbestNE(2))-pbestNE(3)*H)
+
+plot(logCuNE,mean(mVAoriginal),'ko','markerfacecolor','c')
+plot(log10(CuTplus),NEmodel,'c-','linewidth',2)
+Device pixel ratio: 1
+Render time: 351373
+Encode time: 18437
+Send time: 1025
+Draw time: 386018
+[I 19:13:14.307 NotebookApp] Saving file at /NDAsample_electrodeA_allcalibs.ipynb
+Executing: % MODEL FOR COMPARISON
+graphics_toolkit("notebook")
+%model with just inorganic speciation
+%geochemical model
+% input the constants and solution chemistry
+
+flag1=2; %flag1 for concentration based search vector (1) or for log based search vector (2).
+flag2=1; %flag2 for numerical derivatives (2) or analtyical derivatives (1)
+database=[]; 
+flag3=0; % flag3 1 for show warnings. 0 no warnings
+flag4=0; %if=1 solve tableau one line at a time to get a good initial guess (no solids). really challenging probs only
+flag5=0; %if=1 use stored initial guess for including solids
+
+CuT=CuTmeas; inorganicTOTALS=[CuT];
+inorganicTOTALS(inorganicTOTALS==0)=1e-16; % get rid of zero values, b/c div by zero error
+TOTALS=[inorganicTOTALS]; %TOTALS=inorganicTOTALS;
+pH=pH; pe=20.75-pH; PCO2=10^-3.5;
+[Cuall,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableauallsolids(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+[CuwithCuOs,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableauCuOs(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+[Cunosolid,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableaunosolid(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+
+plot(log10(CuTplus),Emeas,'bo','markersize',8,'markerfacecolor','b')
+
+hold on
+possibleresults=[logCuonept logCuoneptmeasuredslope logCufullcalib logCulinearcalib logCulowslopecalib];
+mVAoriginals=mean(mVAoriginal)*ones(size(possibleresults));
+plot(possibleresults,mVAoriginals,'ko','markerfacecolor','w')
+
+paramTait=[m1 Eo1];
+logCuplot=-13:0.1:-3; Eplot=polyval(paramTait,logCuplot);
+plot(logCuplot,Eplot,'r-','linewidth',1)
+
+paramTait2=[m2 Eo2];
+logCuplot=-13:0.1:-3; Eplot=polyval(paramTait2,logCuplot);
+plot(logCuplot,Eplot,'r--','linewidth',1)
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param2,logCuplot);
+plot(logCuplot,Eplot,'k--')
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param3,logCuplot);
+plot(logCuplot,Eplot,'k:')
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param4,logCuplot);
+plot(logCuplot,Eplot,'k-')
+
+set(gca,'linewidth',2)
+xlabel('log[Cu^{2+}]'); ylabel('E (mV)')
+hold on
+
+plot([log10(Cuall) log10(Cuall)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--')
+plot([log10(Cunosolid) log10(Cunosolid)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--'); hold on
+plot([log10(CuT) log10(CuT)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--','linewidth',2)
+plot([-9.672 -9.672],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--') % model from CHEAQS
+
+text(log10(Cunosolid)+0.1,max(Emeas)-(max(Emeas)-mean(mVAoriginal))/4,'model Cu^{2+}','rotation',90)
+text(log10(CuT)+0.1,max(Emeas)-(max(Emeas)-mean(mVAoriginal))/4,'Total Cu','rotation',90)
+
+
+xlabel('log([Cu^{2+}])')
+ylabel('Potential (mV)')
+set(gca,'LineWidth',2,'fontsize',12)
+
+axis([min(log10([Cunosolid Cuall]))-1 max(log10(CuTplus))+0.2 min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)])
+
+
+% nonlinear fit
+logx=min(possibleresults)-0.2:0.1:max(log10(CuTplus))+1;
+model=logisticfunction(pbest,logx);
+plot(logx,model,'m--','linewidth',2)
+
+logCunonlinear=-((log10((pbest(2)-pbest(1))/(mean(mVAoriginal)-pbest(1))-1))/pbest(4)-pbest(3))
+
+H=10.^-pH; logCuNE=log10(10.^((mean(mVAoriginal)-pbestNE(1))./pbestNE(2))-pbestNE(3)*H)
+
+plot(logCuNE,mean(mVAoriginal),'ko','markerfacecolor','c')
+plot(log10(CuTplus),NEmodel,'c-','linewidth',2)
+Device pixel ratio: 1
+Render time: 339279
+Encode time: 18129
+Send time: 999
+Draw time: 372238
+Executing: % MODEL FOR COMPARISON
+graphics_toolkit("notebook")
+%model with just inorganic speciation
+%geochemical model
+% input the constants and solution chemistry
+
+flag1=2; %flag1 for concentration based search vector (1) or for log based search vector (2).
+flag2=1; %flag2 for numerical derivatives (2) or analtyical derivatives (1)
+database=[]; 
+flag3=0; % flag3 1 for show warnings. 0 no warnings
+flag4=0; %if=1 solve tableau one line at a time to get a good initial guess (no solids). really challenging probs only
+flag5=0; %if=1 use stored initial guess for including solids
+
+CuT=CuTmeas; inorganicTOTALS=[CuT];
+inorganicTOTALS(inorganicTOTALS==0)=1e-16; % get rid of zero values, b/c div by zero error
+TOTALS=[inorganicTOTALS]; %TOTALS=inorganicTOTALS;
+pH=pH; pe=20.75-pH; PCO2=10^-3.5;
+[Cuall,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableauallsolids(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+[CuwithCuOs,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableauCuOs(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+[Cunosolid,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableaunosolid(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+
+plot(log10(CuTplus),Emeas,'bo','markersize',8,'markerfacecolor','b')
+
+hold on
+possibleresults=[logCuonept logCuoneptmeasuredslope logCufullcalib logCulinearcalib logCulowslopecalib];
+mVAoriginals=mean(mVAoriginal)*ones(size(possibleresults));
+plot(possibleresults,mVAoriginals,'ko','markerfacecolor','w')
+
+paramTait=[m1 Eo1];
+logCuplot=-13:0.1:-3; Eplot=polyval(paramTait,logCuplot);
+plot(logCuplot,Eplot,'r-','linewidth',1)
+
+paramTait2=[m2 Eo2];
+logCuplot=-13:0.1:-3; Eplot=polyval(paramTait2,logCuplot);
+plot(logCuplot,Eplot,'r--','linewidth',1)
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param2,logCuplot);
+plot(logCuplot,Eplot,'k--')
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param3,logCuplot);
+plot(logCuplot,Eplot,'k:')
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param4,logCuplot);
+plot(logCuplot,Eplot,'k-')
+
+set(gca,'linewidth',2)
+xlabel('log[Cu^{2+}]'); ylabel('E (mV)')
+hold on
+
+plot([log10(Cuall) log10(Cuall)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--')
+plot([log10(Cunosolid) log10(Cunosolid)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--'); hold on
+plot([log10(CuT) log10(CuT)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--','linewidth',2)
+plot([-9.672 -9.672],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'r--') % model from CHEAQS
+
+text(log10(Cunosolid)+0.1,max(Emeas)-(max(Emeas)-mean(mVAoriginal))/4,'model Cu^{2+}','rotation',90)
+text(log10(CuT)+0.1,max(Emeas)-(max(Emeas)-mean(mVAoriginal))/4,'Total Cu','rotation',90)
+
+
+xlabel('log([Cu^{2+}])')
+ylabel('Potential (mV)')
+set(gca,'LineWidth',2,'fontsize',12)
+
+axis([min(log10([Cunosolid Cuall]))-1 max(log10(CuTplus))+0.2 min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)])
+
+
+% nonlinear fit
+logx=min(possibleresults)-0.2:0.1:max(log10(CuTplus))+1;
+model=logisticfunction(pbest,logx);
+plot(logx,model,'m--','linewidth',2)
+
+logCunonlinear=-((log10((pbest(2)-pbest(1))/(mean(mVAoriginal)-pbest(1))-1))/pbest(4)-pbest(3))
+
+H=10.^-pH; logCuNE=log10(10.^((mean(mVAoriginal)-pbestNE(1))./pbestNE(2))-pbestNE(3)*H)
+
+plot(logCuNE,mean(mVAoriginal),'ko','markerfacecolor','c')
+plot(log10(CuTplus),NEmodel,'c-','linewidth',2)
+Device pixel ratio: 1
+Render time: 343002
+Encode time: 18084
+Send time: 1234
+Draw time: 377194
+Executing: % MODEL FOR COMPARISON
+graphics_toolkit("notebook")
+%model with just inorganic speciation
+%geochemical model
+% input the constants and solution chemistry
+
+flag1=2; %flag1 for concentration based search vector (1) or for log based search vector (2).
+flag2=1; %flag2 for numerical derivatives (2) or analtyical derivatives (1)
+database=[]; 
+flag3=0; % flag3 1 for show warnings. 0 no warnings
+flag4=0; %if=1 solve tableau one line at a time to get a good initial guess (no solids). really challenging probs only
+flag5=0; %if=1 use stored initial guess for including solids
+
+CuT=CuTmeas; inorganicTOTALS=[CuT];
+inorganicTOTALS(inorganicTOTALS==0)=1e-16; % get rid of zero values, b/c div by zero error
+TOTALS=[inorganicTOTALS]; %TOTALS=inorganicTOTALS;
+pH=pH; pe=20.75-pH; PCO2=10^-3.5;
+[Cuall,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableauallsolids(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+[CuwithCuOs,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableauCuOs(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+[Cunosolid,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableaunosolid(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+
+plot(log10(CuTplus),Emeas,'bo','markersize',8,'markerfacecolor','b')
+
+hold on
+possibleresults=[logCuonept logCuoneptmeasuredslope logCufullcalib logCulinearcalib logCulowslopecalib];
+mVAoriginals=mean(mVAoriginal)*ones(size(possibleresults));
+plot(possibleresults,mVAoriginals,'ko','markerfacecolor','w')
+
+paramTait=[m1 Eo1];
+logCuplot=-13:0.1:-3; Eplot=polyval(paramTait,logCuplot);
+plot(logCuplot,Eplot,'r-','linewidth',1)
+
+paramTait2=[m2 Eo2];
+logCuplot=-13:0.1:-3; Eplot=polyval(paramTait2,logCuplot);
+plot(logCuplot,Eplot,'r--','linewidth',1)
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param2,logCuplot);
+plot(logCuplot,Eplot,'k--')
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param3,logCuplot);
+plot(logCuplot,Eplot,'k:')
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param4,logCuplot);
+plot(logCuplot,Eplot,'k-')
+
+set(gca,'linewidth',2)
+xlabel('log[Cu^{2+}]'); ylabel('E (mV)')
+hold on
+
+plot([log10(Cuall) log10(Cuall)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--')
+plot([log10(Cunosolid) log10(Cunosolid)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--'); hold on
+plot([log10(CuT) log10(CuT)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--','linewidth',2)
+plot([-9.672 -9.672],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'r--') % model from CHEAQS
+
+text(log10(Cunosolid)+0.1,max(Emeas)-(max(Emeas)-mean(mVAoriginal))/4,'model Cu^{2+}','rotation',90)
+text(log10(CuT)+0.1,max(Emeas)-(max(Emeas)-mean(mVAoriginal))/4,'Total Cu','rotation',90)
+
+
+xlabel('log([Cu^{2+}])')
+ylabel('Potential (mV)')
+set(gca,'LineWidth',2,'fontsize',12)
+
+axis([-10 max(log10(CuTplus))+0.2 min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)])
+
+
+% nonlinear fit
+logx=min(possibleresults)-0.2:0.1:max(log10(CuTplus))+1;
+model=logisticfunction(pbest,logx);
+plot(logx,model,'m--','linewidth',2)
+
+logCunonlinear=-((log10((pbest(2)-pbest(1))/(mean(mVAoriginal)-pbest(1))-1))/pbest(4)-pbest(3))
+
+H=10.^-pH; logCuNE=log10(10.^((mean(mVAoriginal)-pbestNE(1))./pbestNE(2))-pbestNE(3)*H)
+
+plot(logCuNE,mean(mVAoriginal),'ko','markerfacecolor','c')
+plot(log10(CuTplus),NEmodel,'c-','linewidth',2)
+Device pixel ratio: 1
+Render time: 351739
+Encode time: 18855
+Send time: 1037
+Draw time: 386773
+Executing: % setup environment
+% set path to equilibrium solver
+txt=pwd;
+n=length(txt);
+rootpath=txt; %txt(1:n-8);
+PHREEQCpath=[rootpath,'/runPHREEQC'];
+addpath(PHREEQCpath);
+JEQUILIBpath=[rootpath,'/JEQUILIB']; addpath(JEQUILIBpath);
+Cumodelspath=[rootpath,'/Cutableaus']; addpath(Cumodelspath);
+% clear data and number format
+clear; format short e
+% turn off warnings
+warning off
+graphics_toolkit ("notebook"); 
+graphics_toolkit ("plotly"); 
+Executing: % put in constants
+VT=0.05; %total volume
+stockCuconc=0.0152067;
+Executing: % put in data
+data=[...
+%volCu mV pH
+0 42.2 2.034
+%50 44.2 2.026  %seems to be an outlier
+150 69.7 2.022
+400 76.6 2.023
+900 82.2 2.026
+];
+
+originalsamplemVnpH=[...
+%pH mV
+7.461 -62.1
+7.467 -62
+];
+Executing: % process the data
+pH=mean(originalsamplemVnpH(:,1))
+mVAoriginal=(originalsamplemVnpH(:,2));
+addedCuvol=data(:,1)'*1e-6;
+pHcalib=data(:,3);
+
+mVA=data(:,2)'; Emeas=mVA; CuTmeas=1e-7; CuT=CuTmeas;
+CuTplus=(CuTmeas*(VT)+addedCuvol*stockCuconc)./(VT+addedCuvol);
+
+%chlorocorrecxtion
+%BF1=2.49; BF2=1.14; BF3=0.9; ClT=4.9904e-4; %from Inorg. Chem. 1983. 22. 3323-3326.
+%CuTplus=CuTplus./(1+BF1*ClT+BF2*ClT^2+BF3*ClT^3);
+
+%determine free Cu for the sample using the method of Tait et al.
+m1=59.2/2; Eacid=Emeas(1); Eorig=mean(mVAoriginal); %m=param(1); 
+Eo1=Eacid-(m1)*log10(CuT);
+logCuonept=(Eorig-Eo1)/m1
+%determine free Cu for the sample using the method of Tait et al. but use measured slope
+param1=polyfit(log10(CuTplus(2:end)),Emeas(2:end),1); m2=param1(1);
+Eacid=Emeas(1); Eorig=mean(mVAoriginal); 
+Eo2=Eacid-(m2)*log10(CuT);
+logCuoneptmeasuredslope=(Eorig-Eo2)/m2
+%determine free Cu using all the calibration points
+param2=polyfit(log10(CuTplus(1:end)),Emeas(1:end),1);
+logCufullcalib=(mean(mVAoriginal)-param2(2))/param2(1)
+%determine free Cu using high Cu additions (linear part)
+param3=polyfit(log10(CuTplus(2:end)),Emeas(2:end),1);
+logCulinearcalib=(mean(mVAoriginal)-param3(2))/param3(1)
+%determine free Cu using two lowest points.  variable slope method like Marcinek et al.
+param4=polyfit(log10(CuTplus(1:2)),Emeas(1:2),1);
+logCulowslopecalib=(mean(mVAoriginal)-param4(2))/param4(1)
+
+%use logisticmodel
+logisticfunction = @(p,logx) (p(1)+(p(2)-p(1))./(1+10.^(p(3)-logx)*p(4)));
+errfunction=@(p,logx,Emeas) (log10(sum((Emeas-logisticfunction(p,logx)).^2)));
+ptst=[40 80 -4 0.7];
+logx=-8:0.1:-3; model=logisticfunction(ptst,logx);
+err=errfunction(ptst,log10(CuTplus),Emeas)
+plot(log10(CuTplus),Emeas,'ko')
+hold on
+plot(logx,model,'k-')
+% now best fit
+options = optimset('Display','off','TolFun',1e-4,'TolX',1e-4);
+pbest=fminsearch(@(p) errfunction(p,log10(CuTplus),Emeas),ptst,options)
+model=logisticfunction(pbest,logx);
+plot(logx,model,'k--')
+list
+string: -8
+list
+string: -7
+list
+string: -6
+list
+string: -5
+list
+string: -4
+list
+string: -3
+list
+string: 40
+list
+string: 50
+list
+string: 60
+list
+string: 70
+list
+string: 80
+list
+string: 90
+string: 
+string: 
+Executing: % fit using Nikolskii-Eisenman equation
+%E=E0+Slog(Cu +kH); parameters E0, S, k
+
+NEeqn=@(p,x1,x2) (p(1)+p(2).*log10(x1+p(3).*x2));
+errfunction=@(p,x1,x2,Emeas) (log10(sum((Emeas-NEeqn(p,x1,x2)).^2)));
+
+
+H=10.^-pHcalib; ptst=[190 59.2/2 0.0006];
+model=NEeqn(ptst,CuTplus',H);
+err=errfunction(ptst,CuTplus',H,Emeas')
+
+plot(log10(CuTplus), Emeas,'ko')
+hold on; plot(log10(CuTplus),model,'k-')
+
+
+% now best fit
+pbestNE=fminsearch(@(p) errfunction(p,CuTplus',H,Emeas'),ptst,options)
+NEmodel=NEeqn(pbestNE,CuTplus',H);
+plot(log10(CuTplus),model,'k--')
+list
+string: -7
+list
+string: -6.5
+list
+string: -6
+list
+string: -5.5
+list
+string: -5
+list
+string: -4.5
+list
+string: -4
+list
+string: -3.5
+list
+string: 30
+list
+string: 40
+list
+string: 50
+list
+string: 60
+list
+string: 70
+list
+string: 80
+list
+string: 90
+string: 
+string: 
+Executing: % MODEL FOR COMPARISON
+graphics_toolkit("notebook")
+%model with just inorganic speciation
+%geochemical model
+% input the constants and solution chemistry
+
+flag1=2; %flag1 for concentration based search vector (1) or for log based search vector (2).
+flag2=1; %flag2 for numerical derivatives (2) or analtyical derivatives (1)
+database=[]; 
+flag3=0; % flag3 1 for show warnings. 0 no warnings
+flag4=0; %if=1 solve tableau one line at a time to get a good initial guess (no solids). really challenging probs only
+flag5=0; %if=1 use stored initial guess for including solids
+
+CuT=CuTmeas; inorganicTOTALS=[CuT];
+inorganicTOTALS(inorganicTOTALS==0)=1e-16; % get rid of zero values, b/c div by zero error
+TOTALS=[inorganicTOTALS]; %TOTALS=inorganicTOTALS;
+pH=pH; pe=20.75-pH; PCO2=10^-3.5;
+[Cuall,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableauallsolids(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+[CuwithCuOs,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableauCuOs(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+[Cunosolid,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableaunosolid(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+
+plot(log10(CuTplus),Emeas,'bo','markersize',8,'markerfacecolor','b')
+
+hold on
+possibleresults=[logCuonept logCuoneptmeasuredslope logCufullcalib logCulinearcalib logCulowslopecalib];
+mVAoriginals=mean(mVAoriginal)*ones(size(possibleresults));
+plot(possibleresults,mVAoriginals,'ko','markerfacecolor','w')
+
+paramTait=[m1 Eo1];
+logCuplot=-13:0.1:-3; Eplot=polyval(paramTait,logCuplot);
+plot(logCuplot,Eplot,'r-','linewidth',1)
+
+paramTait2=[m2 Eo2];
+logCuplot=-13:0.1:-3; Eplot=polyval(paramTait2,logCuplot);
+plot(logCuplot,Eplot,'r--','linewidth',1)
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param2,logCuplot);
+plot(logCuplot,Eplot,'k--')
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param3,logCuplot);
+plot(logCuplot,Eplot,'k:')
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param4,logCuplot);
+plot(logCuplot,Eplot,'k-')
+
+set(gca,'linewidth',2)
+xlabel('log[Cu^{2+}]'); ylabel('E (mV)')
+hold on
+
+plot([log10(Cuall) log10(Cuall)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--')
+plot([log10(Cunosolid) log10(Cunosolid)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--'); hold on
+plot([log10(CuT) log10(CuT)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--','linewidth',2)
+plot([-9.672 -9.672],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'r--') % model from CHEAQS
+
+text(log10(Cunosolid)+0.1,max(Emeas)-(max(Emeas)-mean(mVAoriginal))/4,'model Cu^{2+}','rotation',90)
+text(log10(CuT)+0.1,max(Emeas)-(max(Emeas)-mean(mVAoriginal))/4,'Total Cu','rotation',90)
+
+
+xlabel('log([Cu^{2+}])')
+ylabel('Potential (mV)')
+set(gca,'LineWidth',2,'fontsize',12)
+
+axis([-10 max(log10(CuTplus))+0.2 min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)])
+
+
+% nonlinear fit
+logx=min(possibleresults)-0.2:0.1:max(log10(CuTplus))+1;
+model=logisticfunction(pbest,logx);
+plot(logx,model,'m--','linewidth',2)
+
+logCunonlinear=-((log10((pbest(2)-pbest(1))/(mean(mVAoriginal)-pbest(1))-1))/pbest(4)-pbest(3))
+
+H=10.^-pH; logCuNE=log10(10.^((mean(mVAoriginal)-pbestNE(1))./pbestNE(2))-pbestNE(3)*H)
+
+plot(logCuNE,mean(mVAoriginal),'ko','markerfacecolor','c')
+plot(log10(CuTplus),NEmodel,'c-','linewidth',2)
+[I 19:15:14.445 NotebookApp] Saving file at /NDAsample_electrodeA_allcalibs.ipynb
+Device pixel ratio: 1
+Render time: 338947
+Encode time: 18253
+Send time: 1105
+Draw time: 371073
+Executing: disp('various calibration results')
+logCuonept
+logCuoneptmeasuredslope
+logCufullcalib
+logCulinearcalib
+logCulowslopecalib
+logCuNE
+disp('model results')
+log10(Cunosolid)
+log10(Cuall)
+Executing: % MODEL FOR COMPARISON
+graphics_toolkit("notebook")
+%model with just inorganic speciation
+%geochemical model
+% input the constants and solution chemistry
+
+flag1=2; %flag1 for concentration based search vector (1) or for log based search vector (2).
+flag2=1; %flag2 for numerical derivatives (2) or analtyical derivatives (1)
+database=[]; 
+flag3=0; % flag3 1 for show warnings. 0 no warnings
+flag4=0; %if=1 solve tableau one line at a time to get a good initial guess (no solids). really challenging probs only
+flag5=0; %if=1 use stored initial guess for including solids
+
+CuT=CuTmeas; inorganicTOTALS=[CuT];
+inorganicTOTALS(inorganicTOTALS==0)=1e-16; % get rid of zero values, b/c div by zero error
+TOTALS=[inorganicTOTALS]; %TOTALS=inorganicTOTALS;
+pH=pH; pe=20.75-pH; PCO2=10^-3.5;
+[Cuall,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableauallsolids(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+[CuwithCuOs,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableauCuOs(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+[Cunosolid,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableaunosolid(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+
+plot(log10(CuTplus),Emeas,'bo','markersize',8,'markerfacecolor','b')
+
+hold on
+possibleresults=[logCuonept logCuoneptmeasuredslope logCufullcalib logCulinearcalib logCulowslopecalib];
+mVAoriginals=mean(mVAoriginal)*ones(size(possibleresults));
+plot(possibleresults,mVAoriginals,'ko','markerfacecolor','w')
+
+paramTait=[m1 Eo1];
+logCuplot=-13:0.1:-3; Eplot=polyval(paramTait,logCuplot);
+plot(logCuplot,Eplot,'r-','linewidth',1)
+
+paramTait2=[m2 Eo2];
+logCuplot=-13:0.1:-3; Eplot=polyval(paramTait2,logCuplot);
+plot(logCuplot,Eplot,'r--','linewidth',1)
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param2,logCuplot);
+plot(logCuplot,Eplot,'k--')
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param3,logCuplot);
+plot(logCuplot,Eplot,'k:')
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param4,logCuplot);
+plot(logCuplot,Eplot,'k-')
+
+set(gca,'linewidth',2)
+xlabel('log[Cu^{2+}]'); ylabel('E (mV)')
+hold on
+
+plot([log10(Cuall) log10(Cuall)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--')
+plot([log10(Cunosolid) log10(Cunosolid)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--'); hold on
+plot([log10(CuT) log10(CuT)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--','linewidth',2)
+plot([-9.672 -9.672],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'r--') % model from CHEAQS
+
+text(log10(Cunosolid)+0.1,max(Emeas)-(max(Emeas)-mean(mVAoriginal))/4,'model Cu^{2+}','rotation',90)
+text(log10(CuT)+0.1,max(Emeas)-(max(Emeas)-mean(mVAoriginal))/4,'Total Cu','rotation',90)
+
+
+xlabel('log([Cu^{2+}])')
+ylabel('Potential (mV)')
+set(gca,'LineWidth',2,'fontsize',12)
+
+axis([-12 max(log10(CuTplus))+0.2 min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)])
+
+
+% nonlinear fit
+logx=min(possibleresults)-0.2:0.1:max(log10(CuTplus))+1;
+model=logisticfunction(pbest,logx);
+plot(logx,model,'m--','linewidth',2)
+
+logCunonlinear=-((log10((pbest(2)-pbest(1))/(mean(mVAoriginal)-pbest(1))-1))/pbest(4)-pbest(3))
+
+H=10.^-pH; logCuNE=log10(10.^((mean(mVAoriginal)-pbestNE(1))./pbestNE(2))-pbestNE(3)*H)
+
+plot(logCuNE,mean(mVAoriginal),'ko','markerfacecolor','c')
+plot(log10(CuTplus),NEmodel,'c-','linewidth',2)
+Device pixel ratio: 1
+Render time: 362251
+Encode time: 19882
+Send time: 5451
+Draw time: 411941
+Executing: % setup environment
+% set path to equilibrium solver
+txt=pwd;
+n=length(txt);
+rootpath=txt; %txt(1:n-8);
+PHREEQCpath=[rootpath,'/runPHREEQC'];
+addpath(PHREEQCpath);
+JEQUILIBpath=[rootpath,'/JEQUILIB']; addpath(JEQUILIBpath);
+Cumodelspath=[rootpath,'/Cutableaus']; addpath(Cumodelspath);
+% clear data and number format
+clear; format short e
+% turn off warnings
+warning off
+graphics_toolkit ("notebook"); 
+graphics_toolkit ("plotly"); 
+Executing: % put in constants
+VT=0.05; %total volume
+stockCuconc=0.0152067;
+Executing: % put in data
+data=[...
+%volCu mV pH
+0 42.2 2.034
+50 44.2 2.026  %seems to be an outlier
+150 69.7 2.022
+400 76.6 2.023
+900 82.2 2.026
+];
+
+originalsamplemVnpH=[...
+%pH mV
+7.461 -62.1
+7.467 -62
+];
+Executing: % process the data
+pH=mean(originalsamplemVnpH(:,1))
+mVAoriginal=(originalsamplemVnpH(:,2));
+addedCuvol=data(:,1)'*1e-6;
+pHcalib=data(:,3);
+
+mVA=data(:,2)'; Emeas=mVA; CuTmeas=1e-7; CuT=CuTmeas;
+CuTplus=(CuTmeas*(VT)+addedCuvol*stockCuconc)./(VT+addedCuvol);
+
+%chlorocorrecxtion
+%BF1=2.49; BF2=1.14; BF3=0.9; ClT=4.9904e-4; %from Inorg. Chem. 1983. 22. 3323-3326.
+%CuTplus=CuTplus./(1+BF1*ClT+BF2*ClT^2+BF3*ClT^3);
+
+%determine free Cu for the sample using the method of Tait et al.
+m1=59.2/2; Eacid=Emeas(1); Eorig=mean(mVAoriginal); %m=param(1); 
+Eo1=Eacid-(m1)*log10(CuT);
+logCuonept=(Eorig-Eo1)/m1
+%determine free Cu for the sample using the method of Tait et al. but use measured slope
+param1=polyfit(log10(CuTplus(2:end)),Emeas(2:end),1); m2=param1(1);
+Eacid=Emeas(1); Eorig=mean(mVAoriginal); 
+Eo2=Eacid-(m2)*log10(CuT);
+logCuoneptmeasuredslope=(Eorig-Eo2)/m2
+%determine free Cu using all the calibration points
+param2=polyfit(log10(CuTplus(1:end)),Emeas(1:end),1);
+logCufullcalib=(mean(mVAoriginal)-param2(2))/param2(1)
+%determine free Cu using high Cu additions (linear part)
+param3=polyfit(log10(CuTplus(2:end)),Emeas(2:end),1);
+logCulinearcalib=(mean(mVAoriginal)-param3(2))/param3(1)
+%determine free Cu using two lowest points.  variable slope method like Marcinek et al.
+param4=polyfit(log10(CuTplus(1:2)),Emeas(1:2),1);
+logCulowslopecalib=(mean(mVAoriginal)-param4(2))/param4(1)
+
+%use logisticmodel
+logisticfunction = @(p,logx) (p(1)+(p(2)-p(1))./(1+10.^(p(3)-logx)*p(4)));
+errfunction=@(p,logx,Emeas) (log10(sum((Emeas-logisticfunction(p,logx)).^2)));
+ptst=[40 80 -4 0.7];
+logx=-8:0.1:-3; model=logisticfunction(ptst,logx);
+err=errfunction(ptst,log10(CuTplus),Emeas)
+plot(log10(CuTplus),Emeas,'ko')
+hold on
+plot(logx,model,'k-')
+% now best fit
+options = optimset('Display','off','TolFun',1e-4,'TolX',1e-4);
+pbest=fminsearch(@(p) errfunction(p,log10(CuTplus),Emeas),ptst,options)
+model=logisticfunction(pbest,logx);
+plot(logx,model,'k--')
+list
+string: -8
+list
+string: -7
+list
+string: -6
+list
+string: -5
+list
+string: -4
+list
+string: -3
+list
+string: 30
+list
+string: 40
+list
+string: 50
+list
+string: 60
+list
+string: 70
+list
+string: 80
+list
+string: 90
+string: 
+string: 
+Executing: % fit using Nikolskii-Eisenman equation
+%E=E0+Slog(Cu +kH); parameters E0, S, k
+
+NEeqn=@(p,x1,x2) (p(1)+p(2).*log10(x1+p(3).*x2));
+errfunction=@(p,x1,x2,Emeas) (log10(sum((Emeas-NEeqn(p,x1,x2)).^2)));
+
+
+H=10.^-pHcalib; ptst=[190 59.2/2 0.0006];
+model=NEeqn(ptst,CuTplus',H);
+err=errfunction(ptst,CuTplus',H,Emeas')
+
+plot(log10(CuTplus), Emeas,'ko')
+hold on; plot(log10(CuTplus),model,'k-')
+
+
+% now best fit
+pbestNE=fminsearch(@(p) errfunction(p,CuTplus',H,Emeas'),ptst,options)
+NEmodel=NEeqn(pbestNE,CuTplus',H);
+plot(log10(CuTplus),model,'k--')
+list
+string: -7
+list
+string: -6.5
+list
+string: -6
+list
+string: -5.5
+list
+string: -5
+list
+string: -4.5
+list
+string: -4
+list
+string: -3.5
+list
+string: 30
+list
+string: 40
+list
+string: 50
+list
+string: 60
+list
+string: 70
+list
+string: 80
+list
+string: 90
+string: 
+string: 
+Executing: % MODEL FOR COMPARISON
+graphics_toolkit("notebook")
+%model with just inorganic speciation
+%geochemical model
+% input the constants and solution chemistry
+
+flag1=2; %flag1 for concentration based search vector (1) or for log based search vector (2).
+flag2=1; %flag2 for numerical derivatives (2) or analtyical derivatives (1)
+database=[]; 
+flag3=0; % flag3 1 for show warnings. 0 no warnings
+flag4=0; %if=1 solve tableau one line at a time to get a good initial guess (no solids). really challenging probs only
+flag5=0; %if=1 use stored initial guess for including solids
+
+CuT=CuTmeas; inorganicTOTALS=[CuT];
+inorganicTOTALS(inorganicTOTALS==0)=1e-16; % get rid of zero values, b/c div by zero error
+TOTALS=[inorganicTOTALS]; %TOTALS=inorganicTOTALS;
+pH=pH; pe=20.75-pH; PCO2=10^-3.5;
+[Cuall,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableauallsolids(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+[CuwithCuOs,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableauCuOs(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+[Cunosolid,CuOH,CuOH2s,CuOs,CuCO3s,tenorite,malachite,MASSERR]=CuOHCO2opentableaunosolid(pH,pe,PCO2,TOTALS',flag1,flag2,flag3,flag4,flag5,database);
+
+plot(log10(CuTplus),Emeas,'bo','markersize',8,'markerfacecolor','b')
+
+hold on
+possibleresults=[logCuonept logCuoneptmeasuredslope logCufullcalib logCulinearcalib logCulowslopecalib];
+mVAoriginals=mean(mVAoriginal)*ones(size(possibleresults));
+plot(possibleresults,mVAoriginals,'ko','markerfacecolor','w')
+
+paramTait=[m1 Eo1];
+logCuplot=-13:0.1:-3; Eplot=polyval(paramTait,logCuplot);
+plot(logCuplot,Eplot,'r-','linewidth',1)
+
+paramTait2=[m2 Eo2];
+logCuplot=-13:0.1:-3; Eplot=polyval(paramTait2,logCuplot);
+plot(logCuplot,Eplot,'r--','linewidth',1)
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param2,logCuplot);
+plot(logCuplot,Eplot,'k--')
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param3,logCuplot);
+plot(logCuplot,Eplot,'k:')
+
+logCuplot=-13:0.1:-3; Eplot=polyval(param4,logCuplot);
+plot(logCuplot,Eplot,'k-')
+
+set(gca,'linewidth',2)
+xlabel('log[Cu^{2+}]'); ylabel('E (mV)')
+hold on
+
+plot([log10(Cuall) log10(Cuall)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--')
+plot([log10(Cunosolid) log10(Cunosolid)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--'); hold on
+plot([log10(CuT) log10(CuT)],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'b--','linewidth',2)
+plot([-9.672 -9.672],[min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)],'r--') % model from CHEAQS
+
+text(log10(Cunosolid)+0.1,max(Emeas)-(max(Emeas)-mean(mVAoriginal))/4,'model Cu^{2+}','rotation',90)
+text(log10(CuT)+0.1,max(Emeas)-(max(Emeas)-mean(mVAoriginal))/4,'Total Cu','rotation',90)
+
+
+xlabel('log([Cu^{2+}])')
+ylabel('Potential (mV)')
+set(gca,'LineWidth',2,'fontsize',12)
+
+axis([-12 max(log10(CuTplus))+0.2 min(mVAoriginal)-(max(Emeas)-mean(mVAoriginal))/4 max(Emeas)+0.2*max(Emeas)])
+
+
+% nonlinear fit
+logx=min(possibleresults)-0.2:0.1:max(log10(CuTplus))+1;
+model=logisticfunction(pbest,logx);
+plot(logx,model,'m--','linewidth',2)
+
+logCunonlinear=-((log10((pbest(2)-pbest(1))/(mean(mVAoriginal)-pbest(1))-1))/pbest(4)-pbest(3))
+
+H=10.^-pH; logCuNE=log10(10.^((mean(mVAoriginal)-pbestNE(1))./pbestNE(2))-pbestNE(3)*H)
+
+plot(logCuNE,mean(mVAoriginal),'ko','markerfacecolor','c')
+plot(log10(CuTplus),NEmodel,'c-','linewidth',2)
+Device pixel ratio: 1
+Render time: 344606
+Encode time: 19379
+Send time: 1327
+Draw time: 381210
+Executing: disp('various calibration results')
+logCuonept
+logCuoneptmeasuredslope
+logCufullcalib
+logCulinearcalib
+logCulowslopecalib
+logCuNE
+disp('model results')
+log10(Cunosolid)
+log10(Cuall)
+[I 19:17:14.610 NotebookApp] Saving file at /NDAsample_electrodeA_allcalibs.ipynb
+Executing: disp('various calibration results')
+logCuonept
+logCuoneptmeasuredslope
+logCufullcalib
+logCulinearcalib
+logCulowslopecalib
+logCuNE
+disp('model results')
+log10(Cunosolid)
+log10(Cuall)
+CHEAQS=-9.672
+[I 19:19:14.748 NotebookApp] Saving file at /NDAsample_electrodeA_allcalibs.ipynb
