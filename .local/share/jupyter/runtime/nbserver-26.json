@@ -2,7 +2,7 @@
   "base_url": "/",
   "hostname": "0.0.0.0",
   "notebook_dir": "/home/jovyan",
-  "password": false,
+  "password": true,
   "pid": 26,
   "port": 8888,
   "secure": false,
